@@ -259,7 +259,7 @@ public class WsManager implements IWsManager {
         }
     }
 
-    private void tryReconnect() {
+    public void tryReconnect() {
         if (!isNeedReconnect | isManualClose) {
             return;
         }
@@ -277,7 +277,7 @@ public class WsManager implements IWsManager {
         reconnectCount++;
     }
 
-    private void cancelReconnect() {
+    public void cancelReconnect() {
         wsMainHandler.removeCallbacks(reconnectRunnable);
         reconnectCount = 0;
     }
