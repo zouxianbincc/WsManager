@@ -1,6 +1,9 @@
 package com.zouxianbin.ws;
 
+import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.os.Looper;
@@ -11,6 +14,7 @@ import com.zouxianbin.ws.listener.WsStatusListener;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
+import okhttp3.Headers;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
@@ -26,8 +30,8 @@ import okio.ByteString;
 
 public class WsManager implements IWsManager {
 
-    private int RECONNECT_INTERVAL = 10 * 1000;    //重连自增步长
-    private long RECONNECT_MAX_TIME = 120 * 1000;   //最大重连间隔
+    private int reConnectInterval;    //重连自增步长
+    private long reConnectMaxTime;   //最大重连间隔
     private Context mContext;
     private String wsUrl;
     private WebSocket mWebSocket;
@@ -40,6 +44,11 @@ public class WsManager implements IWsManager {
     private Lock mLock;
     private WeakHandler wsMainHandler = new WeakHandler(Looper.getMainLooper());
     private int reconnectCount = 0;   //重连次数
+    private Headers headers;
+
+    private NetStatusReceiver netStatusReceiver;
+
+
     private Runnable reconnectRunnable = new Runnable() {
         @Override
         public void run() {
@@ -136,7 +145,6 @@ public class WsManager implements IWsManager {
 
         @Override
         public void onFailure(WebSocket webSocket, final Throwable t, final Response response) {
-            tryReconnect();
             if (wsStatusListener != null) {
                 if (Looper.myLooper() != Looper.getMainLooper()) {
                     wsMainHandler.post(new Runnable() {
@@ -149,6 +157,7 @@ public class WsManager implements IWsManager {
                     wsStatusListener.onFailure(t, response);
                 }
             }
+            tryReconnect();
         }
     };
 
@@ -156,11 +165,12 @@ public class WsManager implements IWsManager {
         mContext = builder.mContext;
         wsUrl = builder.wsUrl;
         isNeedReconnect = builder.needReconnect;
-        RECONNECT_INTERVAL = builder.reconnectInterval;
-        RECONNECT_MAX_TIME = builder.reconnectMaxTimeInterval;
         mOkHttpClient = builder.mOkHttpClient;
-
+        reConnectInterval = builder.reConnectInterval;
+        reConnectMaxTime = builder.reConnectMaxTime;
+        headers = builder.headers;
         this.mLock = new ReentrantLock();
+        netStatusReceiver = new NetStatusReceiver();
     }
 
     private void initWebSocket() {
@@ -170,9 +180,16 @@ public class WsManager implements IWsManager {
                     .build();
         }
         if (mRequest == null) {
-            mRequest = new Request.Builder()
-                    .url(wsUrl)
-                    .build();
+            if (null == headers) {
+                mRequest = new Request.Builder()
+                        .url(wsUrl)
+                        .build();
+            } else {
+                mRequest = new Request.Builder()
+                        .url(wsUrl)
+                        .headers(headers)
+                        .build();
+            }
         }
         mOkHttpClient.dispatcher().cancelAll();
         try {
@@ -215,12 +232,17 @@ public class WsManager implements IWsManager {
     public void startConnect() {
         isManualClose = false;
         buildConnect();
+        IntentFilter filter = new IntentFilter(ConnectivityManager.CONNECTIVITY_ACTION);
+        mContext.registerReceiver(netStatusReceiver, filter);
     }
 
     @Override
     public void stopConnect() {
         isManualClose = true;
         disconnect();
+        if (netStatusReceiver !=null) {
+            mContext.unregisterReceiver(netStatusReceiver);
+        }
     }
 
     private void tryReconnect() {
@@ -235,9 +257,9 @@ public class WsManager implements IWsManager {
 
         setCurrentStatus(WsStatus.RECONNECT);
 
-        long delay = reconnectCount * RECONNECT_INTERVAL;
+        long delay = reconnectCount * reConnectInterval;
         wsMainHandler
-                .postDelayed(reconnectRunnable, delay > RECONNECT_MAX_TIME ? RECONNECT_MAX_TIME : delay);
+                .postDelayed(reconnectRunnable, delay > reConnectMaxTime ? reConnectMaxTime : delay);
         reconnectCount++;
     }
 
@@ -315,25 +337,15 @@ public class WsManager implements IWsManager {
     //检查网络是否连接
     private boolean isNetworkConnected(Context context) {
         if (context != null) {
-            try {
-                ConnectivityManager connectivity = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
-                if (connectivity != null) {
-
-                    NetworkInfo info = connectivity.getActiveNetworkInfo();
-                    if (info != null && info.isConnected()) {
-
-                        if (info.getState() == NetworkInfo.State.CONNECTED) {
-                            return true;
-                        }
-                    }
-                }
-            } catch (Exception e) {
-                return false;
+            ConnectivityManager mConnectivityManager = (ConnectivityManager) context
+                    .getSystemService(Context.CONNECTIVITY_SERVICE);
+            NetworkInfo mNetworkInfo = mConnectivityManager
+                    .getActiveNetworkInfo();
+            if (mNetworkInfo != null) {
+                return mNetworkInfo.isAvailable();
             }
-            return false;
         }
         return false;
-
     }
 
     public static final class Builder {
@@ -341,9 +353,10 @@ public class WsManager implements IWsManager {
         private Context mContext;
         private String wsUrl;
         private boolean needReconnect = true;
-        private int reconnectInterval = 0;
-        private int reconnectMaxTimeInterval = 0;
+        private int reConnectInterval = 10 * 1000;
+        private long reConnectMaxTime = 120 * 1000;
         private OkHttpClient mOkHttpClient;
+        private Headers headers;
 
         public Builder(Context val) {
             mContext = val;
@@ -364,13 +377,18 @@ public class WsManager implements IWsManager {
             return this;
         }
 
-        public Builder reconnectInterval(int val) {
-            reconnectInterval = val;
+        public Builder setReconnnectInterval(int val) {
+            reConnectInterval = val;
             return this;
         }
 
-        public Builder reconnectMaxTimeInterval(int val) {
-            reconnectMaxTimeInterval = val;
+        public Builder setReconnnectIMaxTime(long val) {
+            reConnectMaxTime = val;
+            return this;
+        }
+
+        public Builder setHeaders(Headers headers) {
+            this.headers = headers;
             return this;
         }
 
@@ -378,4 +396,28 @@ public class WsManager implements IWsManager {
             return new WsManager(this);
         }
     }
+
+
+    public class NetStatusReceiver extends BroadcastReceiver {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+            if (ConnectivityManager.CONNECTIVITY_ACTION.equals(action)) {
+
+                // 获取网络连接管理器
+                ConnectivityManager connectivityManager
+                        = (ConnectivityManager) mContext
+                        .getSystemService(Context.CONNECTIVITY_SERVICE);
+                // 获取当前网络状态信息
+                NetworkInfo info = connectivityManager.getActiveNetworkInfo();
+
+                if (info != null && info.isAvailable()) {
+                    cancelReconnect();
+                    tryReconnect();
+                }
+
+            }
+        }
+    }
+
 }
