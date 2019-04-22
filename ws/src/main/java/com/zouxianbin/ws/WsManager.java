@@ -59,7 +59,9 @@ public class WsManager implements IWsManager {
         }
     };
     private WebSocketListener mWebSocketListener = new WebSocketListener() {
-
+        /**
+         *  当服务器建立好了连接之后，会调用此方法，一般就是在这里做登录/鉴权操作
+         */
         @Override
         public void onOpen(WebSocket webSocket, final Response response) {
             mWebSocket = webSocket;
@@ -78,7 +80,9 @@ public class WsManager implements IWsManager {
                 }
             }
         }
-
+        /**
+         *  收到了服务器发送的消息，text就是收到的消息
+         */
         @Override
         public void onMessage(WebSocket webSocket, final ByteString bytes) {
             if (wsStatusListener != null) {
@@ -95,6 +99,9 @@ public class WsManager implements IWsManager {
             }
         }
 
+        /**
+         *  收到了服务器发送的消息，bytes就是收到的消息
+         */
         @Override
         public void onMessage(WebSocket webSocket, final String text) {
             if (wsStatusListener != null) {
@@ -110,7 +117,9 @@ public class WsManager implements IWsManager {
                 }
             }
         }
-
+        /**
+         *  正在关闭当前websocket的时候会调用此方法
+         */
         @Override
         public void onClosing(WebSocket webSocket, final int code, final String reason) {
             if (wsStatusListener != null) {
@@ -126,7 +135,9 @@ public class WsManager implements IWsManager {
                 }
             }
         }
-
+        /**
+         * 关闭完成后会调用此方法，一般是主动关闭后会调用
+         */
         @Override
         public void onClosed(WebSocket webSocket, final int code, final String reason) {
             if (wsStatusListener != null) {
@@ -142,7 +153,10 @@ public class WsManager implements IWsManager {
                 }
             }
         }
-
+        /**
+         *  连接报错的时候会调用，如果需要重连的话一般就是在这里进行重连逻辑
+         *  出错原因有很多可能，比如本地网络因素，服务器报错之类，都会走这里
+         */
         @Override
         public void onFailure(WebSocket webSocket, final Throwable t, final Response response) {
             if (wsStatusListener != null) {
