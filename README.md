@@ -12,6 +12,6 @@
   
 # Add the dependency
   	dependencies {
-	        implementation 'com.github.zouxianbincc:WsManager:1.0.0'
+	        implementation 'com.github.zouxianbincc:WsManager:1.0.1'
 	}
    
