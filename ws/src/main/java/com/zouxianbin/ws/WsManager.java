@@ -26,8 +26,8 @@ import okio.ByteString;
 
 public class WsManager implements IWsManager {
 
-    private final static int RECONNECT_INTERVAL = 10 * 1000;    //重连自增步长
-    private final static long RECONNECT_MAX_TIME = 120 * 1000;   //最大重连间隔
+    private int RECONNECT_INTERVAL = 10 * 1000;    //重连自增步长
+    private long RECONNECT_MAX_TIME = 120 * 1000;   //最大重连间隔
     private Context mContext;
     private String wsUrl;
     private WebSocket mWebSocket;
@@ -156,7 +156,10 @@ public class WsManager implements IWsManager {
         mContext = builder.mContext;
         wsUrl = builder.wsUrl;
         isNeedReconnect = builder.needReconnect;
+        RECONNECT_INTERVAL = builder.reconnectInterval;
+        RECONNECT_MAX_TIME = builder.reconnectMaxTimeInterval;
         mOkHttpClient = builder.mOkHttpClient;
+
         this.mLock = new ReentrantLock();
     }
 
@@ -338,6 +341,8 @@ public class WsManager implements IWsManager {
         private Context mContext;
         private String wsUrl;
         private boolean needReconnect = true;
+        private int reconnectInterval = 0;
+        private int reconnectMaxTimeInterval = 0;
         private OkHttpClient mOkHttpClient;
 
         public Builder(Context val) {
@@ -356,6 +361,16 @@ public class WsManager implements IWsManager {
 
         public Builder needReconnect(boolean val) {
             needReconnect = val;
+            return this;
+        }
+
+        public Builder reconnectInterval(int val) {
+            reconnectInterval = val;
+            return this;
+        }
+
+        public Builder reconnectMaxTimeInterval(int val) {
+            reconnectMaxTimeInterval = val;
             return this;
         }
 
