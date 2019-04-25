@@ -349,7 +349,7 @@ public class WsManager implements IWsManager {
     }
 
     //检查网络是否连接
-    private boolean isNetworkConnected(Context context) {
+    public boolean isNetworkConnected(Context context) {
         if (context != null) {
             ConnectivityManager mConnectivityManager = (ConnectivityManager) context
                     .getSystemService(Context.CONNECTIVITY_SERVICE);
